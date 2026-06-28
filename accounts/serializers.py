@@ -1,10 +1,14 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from config.fields import SafeImageField
+
 from .models import ActivityLog, User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar = SafeImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
         fields = ["id", "username", "email", "first_name", "last_name", "phone", "avatar", "role", "date_joined"]

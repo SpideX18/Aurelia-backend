@@ -1,9 +1,13 @@
 from rest_framework import serializers
 
+from config.fields import SafeImageField
+
 from .models import SiteSettings
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
+    logo = SafeImageField(required=False, allow_null=True)
+
     class Meta:
         model = SiteSettings
         fields = [

@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from config.fields import SafeImageField
+
 from .models import Agent, AgentReview
 
 
@@ -15,6 +17,7 @@ class AgentReviewSerializer(serializers.ModelSerializer):
 class AgentListSerializer(serializers.ModelSerializer):
     active_listings_count = serializers.ReadOnlyField()
     sold_count = serializers.ReadOnlyField()
+    photo = SafeImageField(required=False, allow_null=True)
 
     class Meta:
         model = Agent
@@ -28,6 +31,7 @@ class AgentDetailSerializer(serializers.ModelSerializer):
     active_listings_count = serializers.ReadOnlyField()
     sold_count = serializers.ReadOnlyField()
     reviews = AgentReviewSerializer(many=True, read_only=True)
+    photo = SafeImageField(required=False, allow_null=True)
 
     class Meta:
         model = Agent

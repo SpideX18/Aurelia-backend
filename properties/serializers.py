@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from config.fields import SafeFileField, SafeImageField
+
 from .models import (
     Amenity,
     FloorPlan,
@@ -21,24 +23,32 @@ class AmenitySerializer(serializers.ModelSerializer):
 
 
 class PropertyImageSerializer(serializers.ModelSerializer):
+    image = SafeImageField()
+
     class Meta:
         model = PropertyImage
         fields = ["id", "image", "caption", "is_cover", "order"]
 
 
 class PropertyVideoSerializer(serializers.ModelSerializer):
+    video_file = SafeFileField(required=False, allow_null=True)
+
     class Meta:
         model = PropertyVideo
         fields = ["id", "video_url", "video_file", "title"]
 
 
 class FloorPlanSerializer(serializers.ModelSerializer):
+    image = SafeImageField()
+
     class Meta:
         model = FloorPlan
         fields = ["id", "image", "title", "area_size"]
 
 
 class PropertyDocumentSerializer(serializers.ModelSerializer):
+    file = SafeFileField()
+
     class Meta:
         model = PropertyDocument
         fields = ["id", "file", "title", "uploaded_at"]
@@ -50,7 +60,7 @@ class AgentMiniSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
     designation = serializers.CharField()
-    photo = serializers.ImageField(required=False)
+    photo = SafeImageField(required=False)
     phone = serializers.CharField()
     email = serializers.EmailField()
 
@@ -74,8 +84,14 @@ class PropertyListSerializer(serializers.ModelSerializer):
     def get_cover_image(self, obj):
         cover = obj.images.filter(is_cover=True).first() or obj.images.first()
         if cover and cover.image:
-            request = self.context.get("request")
             url = cover.image.url
+            # Cloudinary (and any storage backend that already returns a
+            # fully-qualified URL) must NOT be re-wrapped with
+            # build_absolute_uri, or Render's own domain gets prepended to
+            # the Cloudinary URL, producing a broken link.
+            if url.startswith("http://") or url.startswith("https://"):
+                return url
+            request = self.context.get("request")
             return request.build_absolute_uri(url) if request else url
         return None
 
@@ -112,7 +128,11 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         photo_url = None
         if obj.agent.photo:
-            photo_url = request.build_absolute_uri(obj.agent.photo.url) if request else obj.agent.photo.url
+            raw_url = obj.agent.photo.url
+            if raw_url.startswith("http://") or raw_url.startswith("https://"):
+                photo_url = raw_url
+            else:
+                photo_url = request.build_absolute_uri(raw_url) if request else raw_url
         return {
             "id": obj.agent.id,
             "name": obj.agent.name,

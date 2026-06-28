@@ -15,10 +15,14 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-change-me-in-p
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = os.environ.get(
-    "DJANGO_ALLOWED_HOSTS",
-    "aurelia-backend-h797.onrender.com,aurelia-state.netlify.app"
-).split(",")
+ALLOWED_HOSTS = [
+    h.strip().rstrip("/")
+    for h in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS",
+        "aurelia-backend-h797.onrender.com,aurelia-state.netlify.app"
+    ).split(",")
+    if h.strip()
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -103,7 +107,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -131,25 +134,61 @@ SIMPLE_JWT = {
 }
 
 # ---- CORS ----
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:5173,https://aurelia-state.netlify.app/"
-).split(",")
+# NOTE: origins must be bare "scheme://host[:port]" with NO trailing slash
+# and NO path. A trailing slash (e.g. "https://example.com/") makes the
+# origin invalid and CORS/CSRF checks will silently fail.
+CORS_ALLOWED_ORIGINS = [
+    o.strip().rstrip("/")
+    for o in os.environ.get(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:5173,https://aurelia-state.netlify.app"
+    ).split(",")
+    if o.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://aurelia-state.netlify.app/",
+    o.strip().rstrip("/")
+    for o in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS", "https://aurelia-state.netlify.app"
+    ).split(",")
+    if o.strip()
 ]
 
-# ---- Cloudinary (optional image storage) ----
+# ---- Production security (only enforced when DEBUG=False) ----
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True") == "True"
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 7  # 1 week; raise once confirmed stable
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# ---- Media storage: Cloudinary in production, local disk in dev ----
+# USE_CLOUDINARY must be set to True on Render (and anywhere media needs to
+# survive restarts/deploys, since Render's filesystem is ephemeral).
 USE_CLOUDINARY = os.environ.get("USE_CLOUDINARY", "False") == "True"
+
 if USE_CLOUDINARY:
     INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
-    STORAGES = {
-        "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
-        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-    }
+
     CLOUDINARY_STORAGE = {
         "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME", ""),
         "API_KEY": os.environ.get("CLOUDINARY_API_KEY", ""),
         "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET", ""),
+        # Ensures Cloudinary always returns https:// URLs (not http://)
+        "SECURE": True,
+    }
+
+    STORAGES = {
+        "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
+else:
+    # Local/dev fallback: files land on disk under MEDIA_ROOT.
+    # NOTE: this is NOT suitable for Render, since the filesystem is wiped
+    # on every deploy/restart. Always set USE_CLOUDINARY=True on Render.
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
     }
