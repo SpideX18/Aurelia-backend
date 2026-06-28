@@ -17,7 +17,7 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.environ.get(
     "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,.onrender.com,aurelia-state.netlify.app"
+    "aurelia-backend-h797.onrender.com,aurelia-state.netlify.app"
 ).split(",")
 
 INSTALLED_APPS = [
@@ -54,6 +54,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    
     
 ]
 
